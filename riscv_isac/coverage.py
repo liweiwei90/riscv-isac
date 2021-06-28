@@ -15,6 +15,9 @@ import riscv_isac.fp_dataset as fmt
 import struct
 import pytablewriter
 
+import riscv_isac.plugins as plugins
+from riscv_isac.plugins.specification import *
+
 unsgn_rs1 = ['sw','sd','sh','sb','ld','lw','lwu','lh','lhu','lb', 'lbu','flw','fld','fsw','fsd'\
         'bgeu', 'bltu', 'sltiu', 'sltu','c.lw','c.ld','c.lwsp','c.ldsp',\
         'c.sw','c.sd','c.swsp','c.sdsp','mulhu','divu','remu','divuw',\
@@ -292,9 +295,9 @@ def compute_per_line(instr, mnemonic, commitvalue, cgf, xlen, addr_pairs,  sig_a
     if instr.instr_name in ["fmadd.s","fmsub.s","fnmadd.s","fnmsub.s"]:
         	rs3_val = '0x' + (arch_state.f_rf[rs3]).lower()
     
-    if instr.instr_name in ['csrrwi']:
-    	arch_state.fcsr = instr.zimm
-    	
+    if instr.instr_name in ["csrrwi"]:
+        arch_state.fcsr = instr.zimm
+
     if instr.instr_name in ["fadd.s","fsub.s","fmul.s","fdiv.s","fsqrt.s","fmadd.s","fmsub.s","fnmadd.s","fnmsub.s","fmax.s","fmin.s","feq.s","flt.s","fle.s","fmv.x.w","fmv.w.x","fcvt.wu.s","fcvt.s.wu","fcvt.w.s","fcvt.s.w","fsgnj.s","fsgnjn.s","fsgnjx.s","fclass.s"]:
          rm = instr.rm
          if(rm==7 or rm==None):
@@ -397,7 +400,7 @@ def compute_per_line(instr, mnemonic, commitvalue, cgf, xlen, addr_pairs,  sig_a
                         elif instr.instr_name in ["fsqrt.s","fmv.x.w","fmv.w.x","fcvt.wu.s","fcvt.s.wu","fcvt.w.s","fcvt.s.w","fclass.s"]:
       	                        val_key = fmt.extract_fields(32, rs1_val, str(1))
       	                        val_key+= " and "
-      	                        val_key+= 'rm == '+ str(rm_val)
+      	                        val_key+= 'rm_val == '+ str(rm_val)
       	                        l=[0]
       	                        l[0] = val_key
       	                        val_key = l
@@ -413,7 +416,8 @@ def compute_per_line(instr, mnemonic, commitvalue, cgf, xlen, addr_pairs,  sig_a
       	                        val_key+= " and "
       	                        val_key+= fmt.extract_fields(32, rs3_val, str(3))
       	                        val_key+= " and "
-      	                        val_key+= 'rm == '+ str(rm_val)
+      	                        val_key+= 'rm_val == '+ str(rm_val)
+      	                        val_key+= '  #nosat'
       	                        l=[0]
       	                        l[0] = val_key
       	                        val_key = l
