@@ -3531,7 +3531,12 @@ def ibm_b19(flen, opcode, ops, seed=-1):
 #            		cvpt += 'rs'+str(x)+'_val=='+str(c[x-1]) # uncomment this if you want rs1_val instead of individual fields
 			cvpt += (extract_fields(flen,c[x-1],str(x)))
 			cvpt += " and "
-		cvpt += 'rm_val == 0'
+		if opcode in ["fadd","fsub","fmul","fdiv","fsqrt","fmadd","fnmadd","fmsub","fnmsub","fcvt","fmv","fle","fmv","fmin","fsgnj"]:
+			cvpt += 'rm_val == 0'
+		elif opcode in ["fclass","flt","fmax","fsgnjn"]:
+			cvpt += 'rm_val == 1'
+		elif opcode in ["feq","flw","fsw","fsgnjx"]:
+			cvpt += 'rm_val == 2'
 		cvpt += ' # '
 		for y in range(1, ops+1):
 			cvpt += 'rs'+str(y)+'_val=='
