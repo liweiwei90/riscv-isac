@@ -4238,7 +4238,7 @@ def ibm_b25(flen, opcode, ops, seed=10):
 		for rm in range(0,5):
 			cvpt = ""
 			for x in range(1, ops+1):
-				cvpt += "rs1 == "+str(c[x-1])
+				cvpt += "rs1_val == "+str(c[x-1])
 				cvpt += " and "
 			cvpt += 'rm_val == '
 			cvpt += str(rm)
@@ -4296,7 +4296,7 @@ def ibm_b26(xlen, opcode, ops, seed=10):
 		for rm in range(0,5):
 			cvpt = ""
 			for x in range(1, ops+1):
-				cvpt += "rs1 == "+str(c[x-1])
+				cvpt += "rs1_val == "+str(c[x-1])
 				cvpt += " and "
 			cvpt += 'rm_val == '
 			cvpt += str(rm)
