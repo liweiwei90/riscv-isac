@@ -396,7 +396,7 @@ def compute_per_line(instr, mnemonic, commitvalue, cgf, xlen, addr_pairs,  sig_a
         	                            stats.ucovpt.append(str(val_key[0]))
         	                        stats.covpt.append(str(val_key[0]))
         	                        cgf[cov_labels]['val_comb'][val_key[0]] += 1
-                        elif instr.instr_name in ["fsqrt.s","fmv.x.w","fmv.w.x","fcvt.wu.s","fcvt.s.wu","fcvt.w.s","fcvt.s.w","fclass.s"]:
+                        elif instr.instr_name in ["fsqrt.s","fmv.x.w","fmv.w.x","fcvt.wu.s","fcvt.w.s","fclass.s"]:
       	                        val_key = fmt.extract_fields(32, rs1_val, str(1))
       	                        val_key+= " and "
       	                        val_key+= 'rm_val == '+ str(rm_val)
