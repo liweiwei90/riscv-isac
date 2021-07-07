@@ -3817,7 +3817,7 @@ def ibm_b21(flen, opcode, ops):
 
 	return coverpoints
 	
-def ibm_b22(flen, opcode, ops, seed=-1):
+def ibm_b22(flen, opcode, ops, seed=10):
 	'''
 	IBM Model B22 Definition:
             This model creates test cases for each of the following exponents (unbiased):
@@ -4241,7 +4241,10 @@ def ibm_b25(flen, opcode, ops, seed=10):
 				cvpt += "rs1_val == "+str(c[x-1])
 				cvpt += " and "
 			cvpt += 'rm_val == '
-			cvpt += str(rm)
+			if "fmv" in opcode:
+			    cvpt += str(0)
+			else:
+			    cvpt += str(rm)
 			cvpt += ' # Number = '
 			cvpt += c[1]
 			coverpoints.append(cvpt)
@@ -4299,7 +4302,10 @@ def ibm_b26(xlen, opcode, ops, seed=10):
 				cvpt += "rs1_val == "+str(c[x-1])
 				cvpt += " and "
 			cvpt += 'rm_val == '
-			cvpt += str(rm)
+			if "fmv" in opcode:
+			    cvpt += str(0)
+			else:
+			    cvpt += str(rm)
 			cvpt += c[1]
 			coverpoints.append(cvpt)
 			k=k+1

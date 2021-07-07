@@ -180,7 +180,6 @@ def merge_coverage(files, cgf, detailed, xlen):
 
     :return: a string contain the final report of the merge.
     '''
-    print("Here")
     for logs in files:
         logs_cov = utils.load_yaml_file(logs)
         for cov_labels, value in logs_cov.items():
@@ -276,11 +275,9 @@ def compute_per_line(instr, mnemonic, commitvalue, cgf, xlen, addr_pairs,  sig_a
         rs1_val = struct.unpack(unsgn_sz, bytes.fromhex(arch_state.x_rf[rs1]))[0]
     elif rs1_type == 'x':
         rs1_val = struct.unpack(sgn_sz, bytes.fromhex(arch_state.x_rf[rs1]))[0]
-        if instr.instr_name in ["fmv.w.x"]:
-            rs1_val = '0x' + (arch_state.x_rf[rs1]).lower()
     elif rs1_type == 'f':
         rs1_val = struct.unpack(sgn_sz, bytes.fromhex(arch_state.f_rf[rs1]))[0]
-        if instr.instr_name in ["fadd.s","fsub.s","fmul.s","fdiv.s","fsqrt.s","fmadd.s","fmsub.s","fnmadd.s","fnmsub.s","fmax.s","fmin.s","feq.s","flt.s","fle.s","fmv.x.w","fmv.w.x","fcvt.wu.s","fcvt.s.wu","fcvt.w.s","fcvt.s.w","fsgnj.s","fsgnjn.s","fsgnjx.s","fclass.s"]:
+        if instr.instr_name in ["fadd.s","fsub.s","fmul.s","fdiv.s","fsqrt.s","fmadd.s","fmsub.s","fnmadd.s","fnmsub.s","fmax.s","fmin.s","feq.s","flt.s","fle.s","fmv.x.w","fcvt.wu.s","fcvt.s.wu","fcvt.w.s","fcvt.s.w","fsgnj.s","fsgnjn.s","fsgnjx.s","fclass.s"]:
             rs1_val = '0x' + (arch_state.f_rf[rs1]).lower()
 
     if instr.instr_name in unsgn_rs2:
@@ -396,7 +393,7 @@ def compute_per_line(instr, mnemonic, commitvalue, cgf, xlen, addr_pairs,  sig_a
         	                            stats.ucovpt.append(str(val_key[0]))
         	                        stats.covpt.append(str(val_key[0]))
         	                        cgf[cov_labels]['val_comb'][val_key[0]] += 1
-                        elif instr.instr_name in ["fsqrt.s","fmv.x.w","fmv.w.x","fcvt.wu.s","fcvt.w.s","fclass.s"]:
+                        elif instr.instr_name in ["fsqrt.s","fmv.x.w","fcvt.wu.s","fcvt.w.s","fclass.s"]:
       	                        val_key = fmt.extract_fields(32, rs1_val, str(1))
       	                        val_key+= " and "
       	                        val_key+= 'rm_val == '+ str(rm_val)
@@ -443,6 +440,11 @@ def compute_per_line(instr, mnemonic, commitvalue, cgf, xlen, addr_pairs,  sig_a
                                     cgf[cov_labels]['val_comb'][val_key[0]] += 1
                         else:
                         	for coverpoints in value['val_comb']:
+        	                    if type(rs1_val) is str:
+        	                        if '0x' in rs1_val:
+        	                            rs1_val = int(rs1_val,16)
+        	                        else:
+        	                            rs1_val = int(rs1_val)
         	                    if eval(coverpoints):
         	                        if cgf[cov_labels]['val_comb'][coverpoints] == 0:
         	                            stats.ucovpt.append(str(coverpoints))
@@ -561,8 +563,6 @@ def compute(trace_file, test_name, cgf, parser_name, decoder_name, detailed, xle
     for instr, mnemonic, addr, commitvalue in iterator:
         if instr is None:
             continue
-        #print(instr, addr, i)
-        #i+=1
         instrObj = (decoder.decode(instr=instr, addr=addr))[0]
         rcgf = compute_per_line(instrObj, mnemonic, commitvalue, cgf, xlen,
                         addr_pairs, sig_addrs)
