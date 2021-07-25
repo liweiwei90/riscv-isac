@@ -269,7 +269,7 @@ def compute_per_line(instr, mnemonic, commitvalue, cgf, xlen, addr_pairs,  sig_a
         imm_val = instr.imm
     if instr.shamt is not None:
         imm_val = instr.shamt
-
+        
     # special value conversion based on signed/unsigned operations
     if instr.instr_name in unsgn_rs1:
         rs1_val = struct.unpack(unsgn_sz, bytes.fromhex(arch_state.x_rf[rs1]))[0]
@@ -277,7 +277,9 @@ def compute_per_line(instr, mnemonic, commitvalue, cgf, xlen, addr_pairs,  sig_a
         rs1_val = struct.unpack(sgn_sz, bytes.fromhex(arch_state.x_rf[rs1]))[0]
     elif rs1_type == 'f':
         rs1_val = struct.unpack(sgn_sz, bytes.fromhex(arch_state.f_rf[rs1]))[0]
-        if instr.instr_name in ["fadd.s","fsub.s","fmul.s","fdiv.s","fsqrt.s","fmadd.s","fmsub.s","fnmadd.s","fnmsub.s","fmax.s","fmin.s","feq.s","flt.s","fle.s","fmv.x.w","fcvt.wu.s","fcvt.s.wu","fcvt.w.s","fcvt.s.w","fsgnj.s","fsgnjn.s","fsgnjx.s","fclass.s"]:
+        if instr.instr_name in ["fadd.s","fsub.s","fmul.s","fdiv.s","fsqrt.s","fmadd.s","fmsub.s","fnmadd.s","fnmsub.s","fmax.s","fmin.s","feq.s"\
+        ,"flt.s","fle.s","fmv.x.w","fcvt.wu.s","fcvt.s.wu","fcvt.w.s","fcvt.s.w","fsgnj.s","fsgnjn.s","fsgnjx.s"\
+        ,"fclass.s","fcvt.l.s","fcvt.lu.s","fcvt.s.l","fcvt.s.lu"]:
             rs1_val = '0x' + (arch_state.f_rf[rs1]).lower()
 
     if instr.instr_name in unsgn_rs2:
@@ -286,7 +288,8 @@ def compute_per_line(instr, mnemonic, commitvalue, cgf, xlen, addr_pairs,  sig_a
         rs2_val = struct.unpack(sgn_sz, bytes.fromhex(arch_state.x_rf[rs2]))[0]
     elif rs2_type == 'f':
         rs2_val = struct.unpack(sgn_sz, bytes.fromhex(arch_state.f_rf[rs2]))[0]
-        if instr.instr_name in ["fadd.s","fsub.s","fmul.s","fdiv.s","fmadd.s","fmsub.s","fnmadd.s","fnmsub.s","fmax.s","fmin.s","feq.s","flt.s","fle.s","fsgnj.s","fsgnjn.s","fsgnjx.s"]:
+        if instr.instr_name in ["fadd.s","fsub.s","fmul.s","fdiv.s","fmadd.s","fmsub.s","fnmadd.s","fnmsub.s","fmax.s","fmin.s","feq.s","flt.s"\
+        ,"fle.s","fsgnj.s","fsgnjn.s","fsgnjx.s"]:
             rs2_val = '0x' + (arch_state.f_rf[rs2]).lower()
 
     if instr.instr_name in ["fmadd.s","fmsub.s","fnmadd.s","fnmsub.s"]:
@@ -295,7 +298,9 @@ def compute_per_line(instr, mnemonic, commitvalue, cgf, xlen, addr_pairs,  sig_a
     if instr.instr_name in ['csrrwi']:
         arch_state.fcsr = instr.zimm
 
-    if instr.instr_name in ["fadd.s","fsub.s","fmul.s","fdiv.s","fsqrt.s","fmadd.s","fmsub.s","fnmadd.s","fnmsub.s","fmax.s","fmin.s","feq.s","flt.s","fle.s","fmv.x.w","fmv.w.x","fcvt.wu.s","fcvt.s.wu","fcvt.w.s","fcvt.s.w","fsgnj.s","fsgnjn.s","fsgnjx.s","fclass.s"]:
+    if instr.instr_name in ["fadd.s","fsub.s","fmul.s","fdiv.s","fsqrt.s","fmadd.s","fmsub.s","fnmadd.s","fnmsub.s","fmax.s","fmin.s","feq.s"\
+    ,"flt.s","fle.s","fmv.x.w","fmv.w.x","fcvt.wu.s","fcvt.s.wu","fcvt.w.s","fcvt.s.w","fsgnj.s","fsgnjn.s","fsgnjx.s"\
+    ,"fclass.s","fcvt.l.s","fcvt.lu.s","fcvt.s.l","fcvt.s.lu"]:
          rm = instr.rm
          if(rm==7 or rm==None):
               rm_val = arch_state.fcsr
@@ -379,6 +384,9 @@ def compute_per_line(instr, mnemonic, commitvalue, cgf, xlen, addr_pairs,  sig_a
                                 cgf[cov_labels]['op_comb'][coverpoints] += 1
                     if 'val_comb' in value and len(value['val_comb']) != 0:
                         if instr.instr_name in ["fadd.s","fsub.s","fmul.s","fdiv.s","fmax.s","fmin.s","feq.s","flt.s","fle.s","fsgnj.s","fsgnjn.s","fsgnjx.s"]:
+      	                        if xlen == 64:
+      	                            rs1_val = rs1_val[8:]
+      	                            rs2_val = rs2_val[8:]
       	                        val_key = fmt.extract_fields(32, rs1_val, str(1))
       	                        val_key+= " and "
       	                        val_key+= fmt.extract_fields(32, rs2_val, str(2))
@@ -393,8 +401,13 @@ def compute_per_line(instr, mnemonic, commitvalue, cgf, xlen, addr_pairs,  sig_a
         	                            stats.ucovpt.append(str(val_key[0]))
         	                        stats.covpt.append(str(val_key[0]))
         	                        cgf[cov_labels]['val_comb'][val_key[0]] += 1
-                        elif instr.instr_name in ["fsqrt.s","fmv.x.w","fcvt.wu.s","fcvt.w.s","fclass.s"]:
-      	                        val_key = fmt.extract_fields(32, rs1_val, str(1))
+                        elif instr.instr_name in ["fsqrt.s","fmv.x.w","fcvt.wu.s","fcvt.w.s","fclass.s","fcvt.l.s","fcvt.lu.s","fcvt.s.l","fcvt.s.lu"]:
+      	                        if xlen == 64 and instr.instr_name not in ["fcvt.s.l", "fcvt.s.lu"]:
+      	                            rs1_val = rs1_val[8:]
+      	                        if instr.instr_name not in ["fcvt.s.l","fcvt.s.lu"]:
+      	                            val_key = fmt.extract_fields(32, rs1_val, str(1))
+      	                        else:
+      	                            val_key = "rs1_val == "+ str(rs1_val)
       	                        val_key+= " and "
       	                        val_key+= 'rm_val == '+ str(rm_val)
       	                        val_key+= '  #nosat'
@@ -407,6 +420,10 @@ def compute_per_line(instr, mnemonic, commitvalue, cgf, xlen, addr_pairs,  sig_a
         	                        stats.covpt.append(str(val_key[0]))
         	                        cgf[cov_labels]['val_comb'][val_key[0]] += 1
                         elif instr.instr_name in ["fmadd.s","fmsub.s","fnmadd.s","fnmsub.s"]:
+      	                        if xlen == 64:
+      	                            rs1_val = rs1_val[8:]
+      	                            rs2_val = rs2_val[8:]
+      	                            rs3_val = rs3_val[8:]
       	                        val_key = fmt.extract_fields(32, rs1_val, str(1))
       	                        val_key+= " and "
       	                        val_key+= fmt.extract_fields(32, rs2_val, str(2))
@@ -512,6 +529,7 @@ def compute_per_line(instr, mnemonic, commitvalue, cgf, xlen, addr_pairs,  sig_a
 
 
     if commitvalue is not None:
+        #print(commitvalue)
         if rd_type == 'x':
             arch_state.x_rf[int(commitvalue[1])] =  str(commitvalue[2][2:])
         elif rd_type == 'f':
@@ -559,8 +577,9 @@ def compute(trace_file, test_name, cgf, parser_name, decoder_name, detailed, xle
     decoder.setup(arch="rv"+str(xlen))
 
     iterator = iter(parser.__iter__()[0])
-    # i = 0
+    
     for instr, mnemonic, addr, commitvalue in iterator:
+        #print("Printing->", instr, commitvalue)
         if instr is None:
             continue
         instrObj = (decoder.decode(instr=instr, addr=addr))[0]

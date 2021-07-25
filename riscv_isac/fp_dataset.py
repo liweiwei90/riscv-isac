@@ -4230,7 +4230,7 @@ def ibm_b25(flen, opcode, ops, seed=10):
 	b25_comb = []
 
 	for data in dataset:
-		b25_comb.append((hex(data[0]),data[1]))
+		b25_comb.append((int(data[0]),data[1]))
 
 	coverpoints = []
 	k=0
