@@ -4071,7 +4071,10 @@ def ibm_b23(flen, opcode, ops):
 				cvpt += (extract_fields(flen,c[x-1],str(x)))
 				cvpt += " and "
 			cvpt += 'rm_val == '
-			cvpt += str(rm)
+			if "fmv" in opcode or opcode in "fcvt.d.s":
+				cvpt += '0'
+			else:
+				cvpt += str(rm)
 			cvpt += ' # '
 			for y in range(1, ops+1):
 				cvpt += 'rs'+str(y)+'_val=='
@@ -4158,7 +4161,10 @@ def ibm_b24(flen, opcode, ops):
 				cvpt += (extract_fields(flen,c[x-1],str(x)))
 				cvpt += " and "
 			cvpt += 'rm_val == '
-			cvpt += str(rm)
+			if "fmv" in opcode or opcode in "fcvt.d.s":
+				cvpt += '0'
+			else:
+				cvpt += str(rm)
 			cvpt += ' # '
 			for y in range(1, ops+1):
 				cvpt += 'rs'+str(y)+'_val=='
@@ -4241,7 +4247,7 @@ def ibm_b25(flen, opcode, ops, seed=10):
 				cvpt += "rs1_val == "+str(c[x-1])
 				cvpt += " and "
 			cvpt += 'rm_val == '
-			if "fmv" in opcode:
+			if "fmv" in opcode or opcode in "fcvt.d.wu":
 			    cvpt += str(0)
 			else:
 			    cvpt += str(rm)
@@ -4302,7 +4308,7 @@ def ibm_b26(xlen, opcode, ops, seed=10):
 				cvpt += "rs1_val == "+str(c[x-1])
 				cvpt += " and "
 			cvpt += 'rm_val == '
-			if "fmv" in opcode:
+			if "fmv" in opcode or opcode in "fcvt.d.wu":
 			    cvpt += str(0)
 			else:
 			    cvpt += str(rm)
@@ -4549,7 +4555,10 @@ def ibm_b29(flen, opcode, ops, seed=10):
 				cvpt += (extract_fields(flen,c[x-1],str(x)))
 				cvpt += " and "
 			cvpt += 'rm_val == '
-			cvpt += str(rm)
+			if "fmv" in opcode or "fcvt.d.s" in opcode:
+				cvpt += '0'
+			else:
+				cvpt += str(rm)
 			cvpt += ' # '
 			for y in range(1, ops+1):
 				cvpt += 'rs'+str(y)+'_val=='
