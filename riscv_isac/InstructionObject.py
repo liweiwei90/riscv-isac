@@ -11,7 +11,7 @@ instrs_fcsr_affected = ['fmadd.s','fmsub.s','fnmsub.s','fnmadd.s','fadd.s','fsub
         'fcvt.s.lu', 'fmadd.d','fmsub.d','fnmsub.d','fnmadd.d','fadd.d','fsub.d',\
         'fmul.d','fdiv.d','fsqrt.d','fmin.d','fmax.d','fcvt.s.d','fcvt.d.s',\
         'feq.d','flt.d','fle.d','fcvt.w.d','fcvt.wu.d','fcvt.l.d','fcvt.lu.d',\
-        'fcvt.d.l','fcvt.d.lu']
+        'fcvt.d.l','fcvt.d.lu','fcvt.s.bf16','fcvt.bf16.s']
 unsgn_rs1 = ['sw','sd','sh','sb','ld','lw','lwu','lh','lhu','lb', 'lbu','flw','fld','fsw','fsd',\
         'bgeu', 'bltu', 'sltiu', 'sltu','c.lw','c.ld','c.lwsp','c.ldsp',\
         'c.sw','c.sd','c.swsp','c.sdsp','mulhu','divu','remu','divuw',\
@@ -390,11 +390,14 @@ class instructionObject():
     @evaluator_func("ext_specific_vars", lambda **params: any([params['instr_name'].startswith(pref) for pref in f_instrs_pref]))
     def evaluate_f_ext_sem(self, instr_vars, arch_state, csr_regfile):
         f_ext_vars = {}
-
+        bf16 = 0
         f_ext_vars['fcsr'] = int(csr_regfile['fcsr'], 16)
 
+        if 'fcvt.s.bf16' in self.instr_name:
+            bf16 = 1
+
         if 'rs1' in instr_vars and instr_vars['rs1'] is not None and instr_vars['rs1'].startswith('f'):
-            self.evaluate_reg_sem_f_ext(instr_vars['rs1_val'], instr_vars['flen'], instr_vars['iflen'], "1", f_ext_vars)
+            self.evaluate_reg_sem_f_ext(instr_vars['rs1_val'], instr_vars['flen'], instr_vars['iflen'], "1", f_ext_vars, bf16)
         if 'rs2' in instr_vars and instr_vars['rs2'] is not None and instr_vars['rs2'].startswith('f'):
             self.evaluate_reg_sem_f_ext(instr_vars['rs2_val'], instr_vars['flen'], instr_vars['iflen'], "2", f_ext_vars)
         if 'rs3' in instr_vars and instr_vars['rs3'] is not None and instr_vars['rs3'].startswith('f'):
@@ -429,14 +432,17 @@ class instructionObject():
         return reg_val
 
 
-    def evaluate_reg_sem_f_ext(self, reg_val, flen, iflen, postfix, f_ext_vars):
+    def evaluate_reg_sem_f_ext(self, reg_val, flen, iflen, postfix, f_ext_vars, bf16=0):
         '''
         This function expands reg_val and defines the respective sign, exponent and mantissa components
         '''
         if reg_val is None:
             return
 
-        if iflen == 32:
+        if bf16:
+            e_sz = 8
+            m_sz = 7
+        elif iflen == 32:
             e_sz = 8
             m_sz = 23
         else:
@@ -444,7 +450,10 @@ class instructionObject():
             m_sz = 52
         bin_val = ('{:0'+str(flen)+'b}').format(reg_val)
 
-        if flen > iflen:
+        if bf16:
+            f_ext_vars['rs'+postfix+'_nan_prefix'] = int((1 << (flen-16)) -1)
+            bin_val = bin_val[flen-16:]
+        elif flen > iflen:
             f_ext_vars['rs'+postfix+'_nan_prefix'] = int(bin_val[0:flen-iflen],2)
             bin_val = bin_val[flen-iflen:]
 

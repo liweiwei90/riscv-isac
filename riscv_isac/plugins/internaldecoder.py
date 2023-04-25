@@ -1846,6 +1846,18 @@ class disassembler():
                 instrObj.rs2 = None
                 return instrObj
 
+        # fcvt.s.bf16, fcvt.bf16.s
+        if funct7 == 0b0100010:
+            if rs2[0] == 0b01000:
+                instrObj.instr_name = 'fcvt.s.bf16'
+                instrObj.rs2 = None
+                return instrObj
+        if funct7 == 0b0100000:
+            if rs2[0] == 0b00110:
+                instrObj.instr_name = 'fcvt.bf16.s'
+                instrObj.rs2 = None
+                return instrObj
+
         # fmv.x.w, fclass.s
         if funct7 == 0b1110000:
             if rm == 0b000:

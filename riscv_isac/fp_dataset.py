@@ -6,6 +6,19 @@ import sys
 import math
 from decimal import *
 
+bfzero       = ['0x0000', '0x8000']
+bfminsubnorm = ['0x0001', '0x8001']
+bfsubnorm    = ['0x0002', '0x8002', '0x007E', '0x807E', '0x0055', '0x8055']
+bfmaxsubnorm = ['0x007F', '0x807F']
+bfminnorm    = ['0x0080', '0x8080']
+bfnorm       = ['0x0081', '0x8081', '0x0085', '0x8085', '0x008A', '0x808A', '0x5500', '0xD500', '0x2A00', '0xAA00']
+bfmaxnorm    = ['0x7F7F', '0xFF7F']
+bfinfinity   = ['0x7F80', '0xFF80']
+bfdefaultnan = ['0x7FC0', '0xFFC0']
+bfqnan       = ['0x7FC1', '0xFFC1', '0x7FC5', '0xFFC5']
+bfsnan       = ['0x7F81', '0xFF81', '0x7FAA', '0xFFAA']
+bfone        = ['0x3F80', '0xBF80']
+
 fzero       = ['0x00000000', '0x80000000']
 fminsubnorm = ['0x00000001', '0x80000001']
 fsubnorm    = ['0x00000002', '0x80000002', '0x007FFFFE', '0x807FFFFE', '0x00555555', '0x80555555']
@@ -50,8 +63,20 @@ get_sanitise_func = lambda opcode: sanitise_norm if any([x in opcode for x in \
         (sanitise_norm_nopref if 'fmv' in opcode else ( sanitise_nopref if any([opcode.endswith(x) \
         for x in ['.l','.w','.lu','.wu']]) else sanitise_cvpt))
 
-def num_explain(flen,num):
+def num_explain(flen,num, bf16=0):
     num_dict = {
+        tuple(bfzero)         : 'bfzero',
+        tuple(bfminsubnorm)     : 'bfminsubnorm',
+        tuple(bfsubnorm)     : 'bfsubnorm',
+        tuple(bfmaxsubnorm)     : 'bfmaxsubnorm',
+        tuple(bfminnorm)     : 'bfminnorm',
+        tuple(bfnorm)         : 'bfnorm',
+        tuple(bfmaxnorm)     : 'bfmaxnorm',
+        tuple(bfinfinity)     : 'bfinfinity',
+        tuple(bfdefaultnan)     : 'bfdefaultnan',
+        tuple(bfqnan)         : 'bfqnan',
+        tuple(bfsnan)         : 'bfsnan',
+        tuple(bfone)         : 'bfone',
         tuple(fzero)         : 'fzero',
         tuple(fminsubnorm)     : 'fminsubnorm',
         tuple(fsubnorm)     : 'fsubnorm',
@@ -82,7 +107,10 @@ def num_explain(flen,num):
         if(('0x'+num[2:].upper()) in num_list[i][0]):
             return(num_list[i][1])
 
-    if flen == 32:
+    if bf16:
+        e_sz = 8
+        m_sz = 7
+    elif flen == 32:
         e_sz = 8
         m_sz = 23
     else:
@@ -91,15 +119,28 @@ def num_explain(flen,num):
     bin_val = bin(int('1'+num[2:],16))[3:]
     sgn = bin_val[0]
     exp = bin_val[1:e_sz+1]
-    man = bin_val[e_sz+1:]
+    man = bin_val[e_sz+1: e_sz+m_sz+1]
 
     if(int(exp,2)!=0):
-        return('fnorm' if flen==32 else 'dnorm')
+        if bf16:
+            return 'bfnorm'
+        elif flen == 32:
+            return 'fnorm'
+        else:
+            return 'dnorm'
     else:
-        return('fsubnorm' if flen==32 else 'dsubnorm')
+        if bf16:
+            return 'bfsubnorm'
+        elif flen == 32:
+            return 'fsubnorm'
+        else:
+            return 'dsubnorm'
 
-def extract_fields(flen, hexstr, postfix):
-    if flen == 32:
+def extract_fields(flen, hexstr, postfix, bf16=0):
+    if bf16:
+        e_sz = 8
+        m_sz = 7
+    elif flen == 32:
         e_sz = 8
         m_sz = 23
     else:
@@ -108,8 +149,12 @@ def extract_fields(flen, hexstr, postfix):
     bin_val = bin(int('1'+hexstr[2:],16))[3:]
     sgn = bin_val[0]
     exp = bin_val[1:e_sz+1]
-    man = bin_val[e_sz+1:]
-    if flen == 32:
+    man = bin_val[e_sz+1:e_sz+m_sz+1]
+    if bf16:
+        string = 'fs'+postfix+' == '+str(sgn) +\
+                 ' and fe'+postfix+' == '+'0x'+str(hex(int('1'+exp,2))[3:]) +\
+                 ' and fm'+postfix+' == '+'0x'+str(hex(int('10'+man,2))[3:])
+    elif flen == 32:
         string = 'fs'+postfix+' == '+str(sgn) +\
                  ' and fe'+postfix+' == '+'0x'+str(hex(int('1'+exp,2))[3:]) +\
                  ' and fm'+postfix+' == '+'0x'+str(hex(int('10'+man,2))[3:])
@@ -120,9 +165,12 @@ def extract_fields(flen, hexstr, postfix):
 
     return string
 
-def fields_dec_converter(flen, hexstr):                            # IEEE-754 Hex -> Decimal Converter
+def fields_dec_converter(flen, hexstr, bf16=0):                            # IEEE-754 Hex -> Decimal Converter
 
-    if flen == 32:
+    if bf16:
+        e_sz = 8
+        m_sz = 7
+    elif flen == 32:
         e_sz = 8
         m_sz = 23
     elif flen == 64:
@@ -131,7 +179,7 @@ def fields_dec_converter(flen, hexstr):                            # IEEE-754 He
     bin_val = bin(int('1'+hexstr[2:],16))[3:]
     sgn = bin_val[0]
     exp = bin_val[1:e_sz+1]
-    man = bin_val[e_sz+1:]
+    man = bin_val[e_sz+1:e_sz+m_sz+1]
 
     num=''
     if(int(sgn)==1):
@@ -141,7 +189,7 @@ def fields_dec_converter(flen, hexstr):                            # IEEE-754 He
 
     exp_str = '*pow(2,'
 
-    if(flen == 32):
+    if(flen == 32) | bf16:
         if((int(exp,2)-127)<-126):
             conv_num = 0.0
             exp_str+= str(-126)+')'
@@ -159,7 +207,7 @@ def fields_dec_converter(flen, hexstr):                            # IEEE-754 He
         conv_num+= (1/(pow(2,i+1)))*int(man[i])
 
     num = sign + str(conv_num) + exp_str
-    if(flen == 32):
+    if(flen == 32) | bf16:
         if(eval(num) > 1e-45 or eval(num)<-1e-45):
             return(eval(num))
         else:
@@ -167,9 +215,14 @@ def fields_dec_converter(flen, hexstr):                            # IEEE-754 He
     elif(flen == 64):
         return(eval(num))
 
-def floatingPoint_tohex(flen,float_no):                            # Decimal -> IEEE-754 Hex Converter
+def floatingPoint_tohex(flen,float_no, bf16=0):                            # Decimal -> IEEE-754 Hex Converter
 
-    if(flen==32):
+    if bf16:
+        if(str(float_no)=='-inf'):
+            return(bfinfinity[1])
+        elif(str(float_no)=='inf'):
+            return(bfinfinity[0])
+    elif(flen==32):
         if(str(float_no)=='-inf'):
             return(finfinity[1])
         elif(str(float_no)=='inf'):
@@ -190,7 +243,20 @@ def floatingPoint_tohex(flen,float_no):                            # Decimal -> 
         sign=1
     nor=float.hex(a)                                    # Normalized Number
 
-    if(flen==32):
+    if bf16:
+        if(int(nor.split("p")[1])<-126):                        # Checking Underflow of Exponent
+            exp_bin=('0'*8)                            # Exponent of Subnormal numbers
+            exp_sn=int(nor.split("p")[1])
+            num="SN"
+        elif(int(nor.split("p")[1])>127):                        # Checking Overflow of Exponent
+            if(sign==0):
+                return "0x7f7f"                        # Most Positive Value
+            else:
+                return "0xff7f"                        # Most Negative Value
+        else:                                        # Converting Exponent to 8-Bit Binary
+            exp=int(nor.split("p")[1])+127
+            exp_bin=('0'*(4-(len(bin(exp))-2)))+bin(exp)[2:]
+    elif(flen==32):
         if(int(nor.split("p")[1])<-126):                        # Checking Underflow of Exponent
             exp_bin=('0'*8)                            # Exponent of Subnormal numbers
             exp_sn=int(nor.split("p")[1])
@@ -229,7 +295,18 @@ def floatingPoint_tohex(flen,float_no):                            # Decimal -> 
         else:
             mant="0x"+nor.split("p")[0][5:]
 
-    if(flen==32):
+    if bf16:
+        mant_bin=bin(int('1'+mant[2:],16))[3:]
+        if(num == "SN"):
+            mant_bin='1'+bin(int('1'+mant[2:],16))[3:]
+            while(exp_sn!=-127):
+                exp_sn+=1
+                mant_bin = '0'+mant_bin
+        binary="0b"
+        binary=binary+str(sign)+exp_bin+mant_bin[0:6]
+        hex_tp=hex(int(binary,2))
+        hex_tp=hex_tp.replace('0x','0x'+'0'*(4-(len(hex_tp)-2)))
+    elif(flen==32):
         mant_bin=bin(int('1'+mant[2:],16))[3:]
         if(num == "SN"):
             mant_bin='1'+bin(int('1'+mant[2:],16))[3:]
@@ -268,7 +345,7 @@ def comments_parser(coverpoints):
         cvpts.append((cvpt+ " #nosat",comment))
     return cvpts
 
-def ibm_b1(flen, iflen, opcode, ops):
+def ibm_b1(flen, iflen, opcode, ops, bf16=0):
     '''
     IBM Model B1 Definition:
         Test all combinations of floating-point basic types, positive and negative, for
@@ -280,11 +357,13 @@ def ibm_b1(flen, iflen, opcode, ops):
     :param flen: Size of the floating point registers
     :param opcode: Opcode for which the coverpoints are to be generated
     :param ops: No. of Operands taken by the opcode
+    :param bf16: BF16 floating point type
 
     :type iflen: int
     :type flen: int
     :type opcode: str
     :type ops: int
+    :type bf16: int
 
     Abstract Dataset Description:
         Operands =>
@@ -298,7 +377,12 @@ def ibm_b1(flen, iflen, opcode, ops):
 
     '''
     sanitise = get_sanitise_func(opcode)
-    if iflen == 32:
+    if bf16:
+        basic_types = bfzero + bfminsubnorm + [bfsubnorm[0], bfsubnorm[3]] +\
+            bfmaxsubnorm + bfminnorm + [bfnorm[0], bfnorm[3]] + bfmaxnorm + \
+            bfinfinity + bfdefaultnan + [bfqnan[0], bfqnan[3]] + \
+            [bfsnan[0], bfsnan[3]] + bfone
+    elif iflen == 32:
         basic_types = fzero + fminsubnorm + [fsubnorm[0], fsubnorm[3]] +\
             fmaxsubnorm + fminnorm + [fnorm[0], fnorm[3]] + fmaxnorm + \
             finfinity + fdefaultnan + [fqnan[0], fqnan[3]] + \
@@ -319,9 +403,9 @@ def ibm_b1(flen, iflen, opcode, ops):
         cvpt = ""
         for x in range(1, ops+1):
 #            cvpt += 'rs'+str(x)+'_val=='+str(c[x-1]) # uncomment this if you want rs1_val instead of individual fields
-            cvpt += (extract_fields(iflen,c[x-1],str(x))) + " and "
+            cvpt += (extract_fields(iflen,c[x-1],str(x), bf16)) + " and "
         if opcode.split('.')[0] in ["fadd","fsub","fmul","fdiv","fsqrt","fmadd","fnmadd","fmsub","fnmsub","fcvt","fmv"]:
-            cvpt = sanitise(0,cvpt,iflen,flen,ops)
+            cvpt = sanitise(0,cvpt, 16 if bf16 else iflen,flen,ops)
         elif opcode.split('.')[0] in \
             ["fclass","flt","fmax","fsgnjn","fmin","fsgnj","feq","flw","fsw","fsgnjx","fld","fle"]:
             cvpt = sanitise(0,cvpt,iflen,flen,ops)
@@ -329,13 +413,13 @@ def ibm_b1(flen, iflen, opcode, ops):
         cvpt += ' # '
         for y in range(1, ops+1):
             cvpt += 'rs'+str(y)+'_val=='
-            cvpt += num_explain(iflen, c[y-1]) + '(' + str(c[y-1]) + ')'
+            cvpt += num_explain(iflen, c[y-1], bf16) + '(' + str(c[y-1]) + ')'
             if(y != ops):
                 cvpt += " and "
         coverpoints.append(cvpt)
 
     mess='Generated'+ (' '*(5-len(str(len(coverpoints)))))+ str(len(coverpoints)) +' '+ \
-    (str(32) if iflen == 32 else str(64)) + '-bit coverpoints using Model B1 for '+opcode+' !'
+    str(iflen) + '-bit coverpoints using Model B1 for '+opcode+' !'
     logger.debug(mess)
     coverpoints = comments_parser(coverpoints)
 
@@ -3916,7 +4000,7 @@ def ibm_b21(flen, iflen, opcode, ops):
 
     return coverpoints
 
-def ibm_b22(flen, iflen, opcode, ops, seed=10):
+def ibm_b22(flen, iflen, opcode, ops, seed=10, bf16=0):
     '''
     IBM Model B22 Definition:
             This model creates test cases for each of the following exponents (unbiased):
@@ -3932,12 +4016,14 @@ def ibm_b22(flen, iflen, opcode, ops, seed=10):
     :param opcode: Opcode for which the coverpoints are to be generated
     :param ops: No. of Operands taken by the opcode
     :param seed: Initial seed value of the random library. (Predefined to -1. Actual value is set with respect to the opcode calling the function)
+    :param bf16: BF16 float point type
 
     :type iflen: int
     :type flen: int
     :type opcode: str
     :type ops: int
     :param seed: int
+    :type bf16: int
 
     Abstract Dataset Description:
             Operand1 = [Smaller than -3, All the values in the range [-3, integer width+3], Larger than integer width + 3]
@@ -3980,7 +4066,59 @@ def ibm_b22(flen, iflen, opcode, ops, seed=10):
 
     b22_comb = []
 
-    if iflen == 32:
+    if bf16:
+        ieee754_maxnorm = '0x1.7fp+127'
+        maxnum = float.fromhex(ieee754_maxnorm)
+        ieee754_minsubnorm = '0x0.01p-126'
+        minsubnorm = float.fromhex(ieee754_minsubnorm)
+        ieee754_maxsubnorm = '0x0.7fp-126'
+        maxsubnorm = float.fromhex(ieee754_maxsubnorm)
+        limnum = maxnum
+        op_dataset = []
+        for i in range(124,xlen+130,1):
+            bits = random.getrandbits(7)
+            bits = bin(bits)[2:]
+            front_zero = 7-len(bits)
+            sig = '0'*front_zero + bits
+
+            exp = i
+            exp = '{:08b}'.format(exp)
+
+            sgn = random.getrandbits(1)
+            sgn = '{:01b}'.format(sgn)
+
+            ir_bin = ('0b'+sgn+exp+sig)
+            op = fields_dec_converter(iflen,'0x'+hex(int('1'+ir_bin[2:],2))[3:],bf16)
+            op_dataset.append([op, ' | Exponent: ' + str(int(exp,2)-127) + ', Exponent in the range [-3, integer width+3]'])
+            b22_comb.append((floatingPoint_tohex(iflen,float(op),bf16),))
+
+        bits = random.getrandbits(7)
+        bits = bin(bits)[2:]
+        front_zero = 7-len(bits)
+        sig = '0'*front_zero + bits
+        exp = random.randint(0,124)
+        exp = '{:08b}'.format(exp)
+        sgn = random.getrandbits(1)
+        sgn = '{:01b}'.format(sgn)
+        ir_bin = ('0b'+sgn+exp+sig)
+        op = fields_dec_converter(iflen,'0x'+hex(int('1'+ir_bin[2:],2))[3:],bf16)
+        op_dataset.append([op, ' | Exponent: ' + str(int(exp,2)-127) + ', Exponent less than -3'])
+        b22_comb.append((floatingPoint_tohex(iflen,float(op),bf16),))
+
+        bits = random.getrandbits(7)
+        bits = bin(bits)[2:]
+        front_zero = 7-len(bits)
+        sig = '0'*front_zero + bits
+        exp = random.randint(xlen+130,255)
+        exp = '{:08b}'.format(exp)
+        sgn = random.getrandbits(1)
+        sgn = '{:01b}'.format(sgn)
+        ir_bin = ('0b'+sgn+exp+sig)
+        op = fields_dec_converter(iflen,'0x'+hex(int('1'+ir_bin[2:],2))[3:],bf16)
+        op_dataset.append([op, ' | Exponent: ' + str(int(exp,2)-127) + ', Exponent greater than (integer width+3)'])
+        b22_comb.append((floatingPoint_tohex(iflen,float(op),bf16),))
+
+    elif iflen == 32:
         ieee754_maxnorm = '0x1.7fffffp+127'
         maxnum = float.fromhex(ieee754_maxnorm)
         ieee754_minsubnorm = '0x0.000001p-126'
@@ -4091,14 +4229,14 @@ def ibm_b22(flen, iflen, opcode, ops, seed=10):
         cvpt = ""
         for x in range(1, 2):
 #                    cvpt += 'rs'+str(x)+'_val=='+str(c[x-1]) # uncomment this if you want rs1_val instead of individual fields
-            cvpt += (extract_fields(iflen,c[x-1],str(x)))
+            cvpt += (extract_fields(iflen,c[x-1],str(x),bf16))
             cvpt += " and "
         # cvpt += 'rm_val == 0'
-        cvpt = sanitise(0,cvpt,iflen,flen,ops)
+        cvpt = sanitise(0,cvpt,16 if bf16 else iflen,flen,ops)
         cvpt += ' # '
         for y in range(1, ops+1):
             cvpt += 'rs'+str(y)+'_val=='
-            cvpt += num_explain(iflen, c[y-1]) + '(' + str(c[y-1]) + ')'
+            cvpt += num_explain(iflen, c[y-1], bf16) + '(' + str(c[y-1]) + ')'
             if(y != ops):
                 cvpt += " and "
         cvpt += op_dataset[k][1]
@@ -4106,13 +4244,13 @@ def ibm_b22(flen, iflen, opcode, ops, seed=10):
         k=k+1
 
     mess='Generated'+ (' '*(5-len(str(len(coverpoints)))))+ str(len(coverpoints)) +' '+ \
-    (str(32) if iflen == 32 else str(64)) + '-bit coverpoints using Model B22 for '+opcode+' !'
+    str(iflen) + '-bit coverpoints using Model B22 for '+opcode+' !'
     logger.debug(mess)
     coverpoints = comments_parser(coverpoints)
 
     return coverpoints
 
-def ibm_b23(flen, iflen, opcode, ops):
+def ibm_b23(flen, iflen, opcode, ops, bf16=0):
     '''
     IBM Model B23 Definition:
             This model creates boundary cases for the rounding to integers that might cause Overflow.
@@ -4130,11 +4268,13 @@ def ibm_b23(flen, iflen, opcode, ops):
     :param flen: Size of the floating point registers
     :param opcode: Opcode for which the coverpoints are to be generated
     :param ops: No. of Operands taken by the opcode
+    :param bf16: BF16 float point type
 
     :type iflen: int
     :type flen: int
     :type opcode: str
     :type ops: int
+    :type bf16: int
 
     Abstract Dataset Description:
             Operand 1 = [ MaxInt-4, MaxInt+5 ]
@@ -4157,7 +4297,12 @@ def ibm_b23(flen, iflen, opcode, ops):
     nums = [0,100,200,800,1600]
     dataset = []
 
-    if iflen == 32:
+    if bf16:
+        maxnum = 0x4f00                                        # MaxInt (2**31-1) in IEEE 754 Floating Point Representation
+
+        for i in range(-4,5):
+                    dataset.append((hex(int(maxnum)+i),"| MaxInt + ({})".format(str(i))))
+    elif iflen == 32:
         maxnum = 0x4f000000                                        # MaxInt (2**31-1) in IEEE 754 Floating Point Representation
 
         for i in range(-4,5):
@@ -4174,19 +4319,19 @@ def ibm_b23(flen, iflen, opcode, ops):
         for rm in range(0,5):
             cvpt = ""
             for x in range(1, ops+1):
-                cvpt += (extract_fields(iflen,c[x-1],str(x)))
+                cvpt += (extract_fields(iflen,c[x-1],str(x),bf16))
                 cvpt += " and "
             # cvpt += 'rm_val == '
             if "fmv" in opcode or opcode in "fcvt.d.s":
                 cvpt = sanitise(0,cvpt,iflen,flen,ops)
                 # cvpt += '0'
             else:
-                cvpt = sanitise(rm,cvpt,iflen,flen,ops)
+                cvpt = sanitise(rm,cvpt,16 if bf16 else iflen,flen,ops)
                 # cvpt += str(rm)
             cvpt += ' # '
             for y in range(1, ops+1):
                 cvpt += 'rs'+str(y)+'_val=='
-                cvpt += num_explain(iflen, c[y-1]) + '(' + str(c[y-1]) + ')'
+                cvpt += num_explain(iflen, c[y-1], bf16) + '(' + str(c[y-1]) + ')'
                 if(y != ops):
                     cvpt += " and "
             cvpt += " "+c[1]
@@ -4194,13 +4339,13 @@ def ibm_b23(flen, iflen, opcode, ops):
             k=k+1
 
     mess='Generated'+ (' '*(5-len(str(len(coverpoints)))))+ str(len(coverpoints)) +' '+\
-    (str(32) if iflen == 32 else str(64)) + '-bit coverpoints using Model B23 for '+opcode+' !'
+    str(iflen) + '-bit coverpoints using Model B23 for '+opcode+' !'
     logger.debug(mess)
     coverpoints = comments_parser(coverpoints)
 
     return (coverpoints)
 
-def ibm_b24(flen,iflen, opcode, ops):
+def ibm_b24(flen,iflen, opcode, ops, bf16=0):
     '''
     IBM Model B24 Definition:
             This model creates boundary cases for rounding to integer that might cause major loss of accuracy.
@@ -4222,11 +4367,13 @@ def ibm_b24(flen,iflen, opcode, ops):
     :param flen: Size of the floating point registers
     :param opcode: Opcode for which the coverpoints are to be generated
     :param ops: No. of Operands taken by the opcode
+    :param bf16: BF16 float point type
 
     :type iflen: int
     :type flen: int
     :type opcode: str
     :type ops: int
+    :type bf16: int
 
     Abstract Dataset Description:
             Operand 1 = [±0,  ±0 ± 0.01, ±0 ± 0.1, ±0 ± 0.11, ±1, ±1 + 0.01, ±1 + 0.1, ±1 + 0.11]
@@ -4259,7 +4406,7 @@ def ibm_b24(flen,iflen, opcode, ops):
 
     for data in dataset:
         t = "{:e}".format(data[0])
-        b24_comb.append((floatingPoint_tohex(iflen,float(t)),data[1]))
+        b24_comb.append((floatingPoint_tohex(iflen,float(t),bf16),data[1]))
 
     b24_comb = set(b24_comb)
 
@@ -4269,19 +4416,19 @@ def ibm_b24(flen,iflen, opcode, ops):
         for rm in range(0,5):
             cvpt = ""
             for x in range(1, ops+1):
-                cvpt += (extract_fields(iflen,c[x-1],str(x)))
+                cvpt += (extract_fields(iflen,c[x-1],str(x), bf16))
                 cvpt += " and "
             # cvpt += 'rm_val == '
             if "fmv" in opcode or opcode in "fcvt.d.s":
                 cvpt = sanitise(0,cvpt,iflen,flen,ops)
                 # cvpt += '0'
             else:
-                cvpt = sanitise(rm,cvpt,iflen,flen,ops)
+                cvpt = sanitise(rm,cvpt,16 if bf16 else iflen,flen,ops)
                 # cvpt += str(rm)
             cvpt += ' # '
             for y in range(1, ops+1):
                 cvpt += 'rs'+str(y)+'_val=='
-                cvpt += num_explain(iflen, c[y-1]) + '(' + str(c[y-1]) + ')'
+                cvpt += num_explain(iflen, c[y-1],bf16) + '(' + str(c[y-1]) + ')'
                 if(y != ops):
                     cvpt += " and "
             cvpt += " | "+c[1]
@@ -4289,7 +4436,7 @@ def ibm_b24(flen,iflen, opcode, ops):
             k=k+1
 
     mess='Generated'+ (' '*(5-len(str(len(coverpoints)))))+ str(len(coverpoints)) +' '+\
-    (str(32) if iflen == 32 else str(64)) + '-bit coverpoints using Model B24 for '+opcode+' !'
+    str(iflen) + '-bit coverpoints using Model B24 for '+opcode+' !'
     logger.debug(mess)
     coverpoints = comments_parser(coverpoints)
 
@@ -4441,7 +4588,7 @@ def ibm_b26(xlen, opcode, ops, seed=10):
 
     return coverpoints
 
-def ibm_b27(flen, iflen, opcode, ops, seed=10):
+def ibm_b27(flen, iflen, opcode, ops, seed=10, bf16=0):
     '''
     IBM Model B27 Definition:
             This model tests the conversion of NaNs from a wider format to a narrow one. Each combination from the following table will create one test case (N represents the number of bits in the significand of the destination's format):
@@ -4479,7 +4626,9 @@ def ibm_b27(flen, iflen, opcode, ops, seed=10):
     sanitise = get_sanitise_func(opcode)
     opcode = opcode.split('.')[0] + '.' + opcode.split('.')[1]
 
-    if iflen == 32:
+    if bf16:
+        dataset = bfsnan + bfqnan
+    elif iflen == 32:
         dataset = fsnan + fqnan
     elif iflen == 64:
         dataset = dsnan + dqnan
@@ -4488,26 +4637,26 @@ def ibm_b27(flen, iflen, opcode, ops, seed=10):
     for c in dataset:
         cvpt = ""
         for x in range(1, ops+1):
-            cvpt += (extract_fields(iflen,c,str(x)))
+            cvpt += (extract_fields(iflen,c,str(x),bf16))
             cvpt += " and "
         # cvpt += 'rm_val == 0'
-        cvpt = sanitise(0,cvpt,iflen,flen,ops)
+        cvpt = sanitise(0,cvpt,16 if bf16 else iflen,flen,ops)
         cvpt += ' # '
         for y in range(1, ops+1):
             cvpt += 'rs'+str(y)+'_val=='
-            cvpt += num_explain(iflen, c) + '(' + str(c) + ')'
+            cvpt += num_explain(iflen, c, bf16) + '(' + str(c) + ')'
             if(y != ops):
                 cvpt += " and "
         coverpoints.append(cvpt)
 
     mess='Generated'+ (' '*(5-len(str(len(coverpoints)))))+ str(len(coverpoints)) +' '+\
-    (str(32) if iflen == 32 else str(64)) + '-bit coverpoints using Model B27 for '+opcode+' !'
+    str(iflen) + '-bit coverpoints using Model B27 for '+opcode+' !'
     logger.debug(mess)
     coverpoints = comments_parser(coverpoints)
 
     return coverpoints
 
-def ibm_b28(flen, iflen, opcode, ops, seed=10):
+def ibm_b28(flen, iflen, opcode, ops, seed=10, bf16=0):
     '''
     IBM Model B28 Definition:
             This model tests the conversion of a floating point number to an integral value, represented in floating-point format. A test case will be created for each of the following inputs:
@@ -4555,7 +4704,29 @@ def ibm_b28(flen, iflen, opcode, ops, seed=10):
     opcode = opcode.split('.')[0] + '.' + opcode.split('.')[1]
     dataset = []
 
-    if iflen == 32:
+    if bf16:
+        dataset.append((bfzero[0],"+0"))
+        dataset.append((floatingPoint_tohex(16,float(random.uniform(0,1)),bf16),"A random number in the range (+0, +1)"))
+        dataset.append((bfone[0],"+1"))
+        for i in range(125,300,25):
+            dataset.append((floatingPoint_tohex(16, i/100, bf16),"Number = "+str(i/100)+" => Number ∈ (1,2.75]"))
+        dataset.append((floatingPoint_tohex(16,float(random.uniform(1,2**31-1)),bf16),"A random number in the range (+1, +1.11..11*2^precision)"))
+        dataset.append((floatingPoint_tohex(16,float(2**31-1),bf16),"MaxInt"))
+        dataset.append((bfinfinity[0],"+Infinity"))
+
+        dataset.append((bfsnan[0],"Signaling NaN"))
+        dataset.append((bfqnan[0],"Quiet NaN"))
+
+        dataset.append((bfzero[1],"-0"))
+        dataset.append((floatingPoint_tohex(16,float(random.uniform(-1,0)),bf16),"A random number in the range (-1, -0)"))
+        dataset.append((bfone[1],"-1"))
+        for i in range(-275,-100,25):
+            dataset.append((floatingPoint_tohex(16, i/100, bf16),"Number = "+str(i/100)+" => Number ∈ [-2.75,-1)"))
+        dataset.append((floatingPoint_tohex(16,float(random.uniform(-2**31-1,-1)),bf16),"A random number in the range (-1.11..11*2^precision, -1)"))
+        dataset.append((floatingPoint_tohex(16,float(-2**31-1),bf16),"-MaxInt"))
+        dataset.append((bfinfinity[1],"-Infinity"))
+
+    elif iflen == 32:
         dataset.append((fzero[0],"+0"))
         dataset.append((floatingPoint_tohex(32,float(random.uniform(0,1))),"A random number in the range (+0, +1)"))
         dataset.append((fone[0],"+1"))
@@ -4603,27 +4774,27 @@ def ibm_b28(flen, iflen, opcode, ops, seed=10):
     for c in dataset:
         cvpt = ""
         for x in range(1, ops+1):
-            cvpt += (extract_fields(iflen,c[x-1],str(x)))
+            cvpt += (extract_fields(iflen,c[x-1],str(x),bf16))
             cvpt += " and "
         # cvpt += 'rm_val == 0'
-        cvpt = sanitise(0,cvpt,iflen,flen,ops)
+        cvpt = sanitise(0,cvpt,16 if bf16 else iflen,flen,ops)
         cvpt += ' # '
         for y in range(1, ops+1):
             cvpt += 'rs'+str(y)+'_val=='
-            cvpt += num_explain(iflen, c[y-1]) + '(' + str(c[y-1]) + ')'
+            cvpt += num_explain(iflen, c[y-1], bf16) + '(' + str(c[y-1]) + ')'
             if(y != ops):
                 cvpt += " and "
         cvpt += " | "+c[1]
         coverpoints.append(cvpt)
 
     mess='Generated'+ (' '*(5-len(str(len(coverpoints)))))+ str(len(coverpoints)) +' '+\
-    (str(32) if iflen == 32 else str(64)) + '-bit coverpoints using Model B28 for '+opcode+' !'
+    str(iflen) + '-bit coverpoints using Model B28 for '+opcode+' !'
     logger.debug(mess)
     coverpoints = comments_parser(coverpoints)
 
     return coverpoints
 
-def ibm_b29(flen, iflen, opcode, ops, seed=10):
+def ibm_b29(flen, iflen, opcode, ops, seed=10, bf16=0):
     '''
     IBM Model B29 Definition:
             This model checks different cases of rounding of the floating point number. A test will be created for each possible combination of the Sign, LSB, Guard bit and the Sticky bit (16 cases for each operation).
@@ -4657,7 +4828,16 @@ def ibm_b29(flen, iflen, opcode, ops, seed=10):
     random.seed(seed)
     sgns = ["0","1"]
     dataset = []
-    if iflen == 32:
+    if bf16:
+        mant = random.getrandbits(4)
+        mant = '{:04b}'.format(mant)
+        for sgn in sgns:
+            for i in range(8):
+                LeastGuardSticky = '{:03b}'.format(i)
+                hexnum = "0x" + hex(int("1"+sgn + "01111100" + mant + LeastGuardSticky,2))[3:]
+                dataset.append((hexnum,"Exp = -3; Sign = {}; LSB = {}; Guard = {}; Sticky = {}"\
+                    .format(sgn,LeastGuardSticky[0],LeastGuardSticky[1],LeastGuardSticky[2])))
+    elif iflen == 32:
         mant = random.getrandbits(20)
         mant = '{:020b}'.format(mant)
         for sgn in sgns:
@@ -4681,26 +4861,26 @@ def ibm_b29(flen, iflen, opcode, ops, seed=10):
         for rm in range(0,5):
             cvpt = ""
             for x in range(1, ops+1):
-                cvpt += (extract_fields(iflen,c[x-1],str(x)))
+                cvpt += (extract_fields(iflen,c[x-1],str(x),bf16))
                 cvpt += " and "
             # cvpt += 'rm_val == '
             if "fmv" in opcode or "fcvt.d.s" in opcode:
                 cvpt = sanitise(0,cvpt,iflen,flen,ops)
                 # cvpt += '0'
             else:
-                cvpt = sanitise(rm,cvpt,iflen,flen,ops)
+                cvpt = sanitise(rm,cvpt,16 if bf16 else iflen,flen,ops)
                 # cvpt += str(rm)
             cvpt += ' # '
             for y in range(1, ops+1):
                 cvpt += 'rs'+str(y)+'_val=='
-                cvpt += num_explain(iflen, c[y-1]) + '(' + str(c[y-1]) + ')'
+                cvpt += num_explain(iflen, c[y-1], bf16) + '(' + str(c[y-1]) + ')'
                 if(y != ops):
                     cvpt += " and "
             cvpt += " | "+c[1]
             coverpoints.append(cvpt)
 
     mess='Generated'+ (' '*(5-len(str(len(coverpoints)))))+ str(len(coverpoints)) +' '+\
-    (str(32) if iflen == 32 else str(64)) + '-bit coverpoints using Model B29 for '+opcode+' !'
+    str(iflen) + '-bit coverpoints using Model B29 for '+opcode+' !'
     logger.debug(mess)
     coverpoints = comments_parser(coverpoints)
 
