@@ -36,7 +36,12 @@ unsgn_rs2 = ['bgeu', 'bltu', 'sltiu', 'sltu', 'sll', 'srl', 'sra','mulhu',\
 f_instrs_pref = ['fadd', 'fclass', 'fcvt', 'fdiv', 'feq', 'fld', 'fle', 'flt', 'flw', 'fmadd',\
         'fmax', 'fmin', 'fmsub', 'fmul', 'fmv', 'fnmadd', 'fnmsub', 'fsd', 'fsgnj', 'fsqrt',\
         'fsub', 'fsw']
-
+f_rs1 = ['fadd', 'fclass', 'fcvt.w', 'fcvt.wu', 'fcvt.l', 'fcvt.lu', 'fcvt.s.d', 'fcvt.d.s', \
+         'fdiv', 'feq', 'fle', 'flt', 'flw', 'fmadd','fmax', 'fmin', 'fmsub', 'fmul', 'fmv.x', \
+         'fnmadd', 'fnmsub', 'fsgnj', 'fsqrt','fsub', 'fcvt.bf16.s', 'fcvt.s.bf16']
+f_rs2 = ['fadd', 'fdiv', 'feq', 'fld', 'fle', 'flt', 'flw', 'fmadd', 'fmax', 'fmin', 'fmsub', \
+         'fmul', 'fnmadd', 'fnmsub', 'fsd', 'fsgnj', 'fsqrt', 'fsub', 'fsw']
+f_rs3 = ['fmsub', 'fnmadd', 'fnmsub']
 
 instr_var_evaluator_funcs = {} # dictionary for holding registered evaluator funcs
 def evaluator_func(instr_var_name, cond):
@@ -379,6 +384,55 @@ class instructionObject():
     def evaluate_rs3_val_fsgn(self, instr_vars, arch_state):
         return self.evaluate_reg_val_fsgn(self.rs3[0], instr_vars['flen'], arch_state)
 
+    '''
+    Evaluator funcs for float point rs1_val
+
+    :param instr_vars: Dictionary of instruction variables already evaluated
+    :param arch_state: Architectural state
+    '''
+    @evaluator_func("frs1_val", lambda **params: any([params['instr_name'].startswith(pref) for pref in f_rs1]))
+    def evaluate_frs1_val(self, instr_vars, arch_state):
+        f_ext_vars = {}
+        if 'fcvt.s.bf16' in self.instr_name:
+            bf16 = 1
+
+        if 'rs1' in instr_vars and instr_vars['rs1'] is not None:
+            self.evaluate_reg_sem_f_ext(instr_vars['rs1_val'], instr_vars['flen'], instr_vars['iflen'], "1", f_ext_vars, bf16)
+
+        return f_ext_vars
+
+
+    '''
+    Evaluator funcs for float point rs2_val
+
+    :param instr_vars: Dictionary of instruction variables already evaluated
+    :param arch_state: Architectural state
+    '''
+    @evaluator_func("frs2_val", lambda **params: any([params['instr_name'].startswith(pref) for pref in f_rs2]))
+    def evaluate_frs2_val(self, instr_vars, arch_state):
+        f_ext_vars = {}
+
+        if 'rs2' in instr_vars and instr_vars['rs2'] is not None:
+            self.evaluate_reg_sem_f_ext(instr_vars['rs2_val'], instr_vars['flen'], instr_vars['iflen'], "2", f_ext_vars)
+
+        return f_ext_vars
+
+
+    '''
+    Evaluator funcs for float point rs3_val
+
+    :param instr_vars: Dictionary of instruction variables already evaluated
+    :param arch_state: Architectural state
+    '''
+    @evaluator_func("frs3_val", lambda **params: any([params['instr_name'].startswith(pref) for pref in f_rs3]))
+    def evaluate_frs3_val(self, instr_vars, arch_state):
+        f_ext_vars = {}
+
+        if 'rs3' in instr_vars and instr_vars['rs3'] is not None:
+            self.evaluate_reg_sem_f_ext(instr_vars['rs3_val'], instr_vars['flen'], instr_vars['iflen'], "3", f_ext_vars)
+
+        return f_ext_vars
+
 
     '''
     Evaluator funcs for extension specific variables
@@ -393,15 +447,17 @@ class instructionObject():
         bf16 = 0
         f_ext_vars['fcsr'] = int(csr_regfile['fcsr'], 16)
 
-        if 'fcvt.s.bf16' in self.instr_name:
-            bf16 = 1
+        frs1_val = self.evaluate_instr_var("frs1_val", instr_vars, arch_state)
+        if frs1_val is not None:
+            f_ext_vars.update(frs1_val)
 
-        if 'rs1' in instr_vars and instr_vars['rs1'] is not None and instr_vars['rs1'].startswith('f'):
-            self.evaluate_reg_sem_f_ext(instr_vars['rs1_val'], instr_vars['flen'], instr_vars['iflen'], "1", f_ext_vars, bf16)
-        if 'rs2' in instr_vars and instr_vars['rs2'] is not None and instr_vars['rs2'].startswith('f'):
-            self.evaluate_reg_sem_f_ext(instr_vars['rs2_val'], instr_vars['flen'], instr_vars['iflen'], "2", f_ext_vars)
-        if 'rs3' in instr_vars and instr_vars['rs3'] is not None and instr_vars['rs3'].startswith('f'):
-            self.evaluate_reg_sem_f_ext(instr_vars['rs3_val'], instr_vars['flen'], instr_vars['iflen'], "3", f_ext_vars)
+        frs2_val = self.evaluate_instr_var("frs2_val", instr_vars, arch_state)
+        if frs2_val is not None:
+            f_ext_vars.update(frs2_val)
+
+        frs3_val = self.evaluate_instr_var("frs3_val", instr_vars, arch_state)
+        if frs3_val is not None:
+            f_ext_vars.update(frs3_val)
 
         return f_ext_vars
 
